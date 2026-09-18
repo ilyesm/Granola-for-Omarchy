@@ -22,6 +22,11 @@ Panel {
   }
   readonly property var featuredEvent: granola.nowEvent || granola.nextEvent
   readonly property var comingUp: granola.upcoming || []
+  readonly property var hoverEvent: {
+    if (comingUp.length > 0) return comingUp[0]
+    if (granola.nextEvent && !granola.nextEvent.happening) return granola.nextEvent
+    return granola.nextEvent || granola.nowEvent
+  }
   readonly property string heroMeta: {
     if (!granola.installed) return "Not installed"
     if (granola.recording) return "Recording"
@@ -36,16 +41,26 @@ Panel {
     return "Start recording"
   }
   readonly property string tooltipText: {
-    if (granola.recording) return "Recording"
-    if (featuredEvent && featuredEvent.title) {
-      var rel = Model.relativeLabel(featuredEvent, nowMs)
-      return featuredEvent.title + (rel ? " · " + rel : "")
+    var event = hoverEvent
+    var lines = []
+    if (granola.recording) lines.push("Recording")
+    if (event && event.title) {
+      lines.push(event.title)
+      var bits = []
+      var rel = Model.relativeLabel(event, nowMs)
+      if (rel && rel !== event.when) bits.push(rel)
+      if (event.when) bits.push(event.when)
+      if (event.location) bits.push(event.location)
+      if (bits.length) lines.push(bits.join(" · "))
     }
-    return granola.statusText
+    if (lines.length === 0) return granola.statusText || "Granola"
+    return lines.join("\n")
   }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
+
+  onTooltipTextChanged: if (button.tooltipHovered && root.bar) root.bar.showTooltip(button, tooltipText)
 
   onOpenedChanged: if (opened) {
     nowMs = Date.now()
