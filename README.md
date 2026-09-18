@@ -9,7 +9,7 @@ No Wine, no VM, no emulation.
 ## Install on Omarchy
 
 ```bash
-omarchy plugin add https://github.com/ilyesm/Granola-for-Linux.git --enable
+omarchy plugin add https://github.com/ilyesm/Granola-for-Omarchy.git --enable
 ```
 
 That clones the plugin into `~/.config/omarchy/plugins/ilyesm.granola` and places **Granola** on the top bar (right by default). Then:

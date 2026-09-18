@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Ilyas Esmail",
   "license": "MIT",
-  "homepage": "https://github.com/ilyesm/Granola-for-Linux",
+  "homepage": "https://github.com/ilyesm/Granola-for-Omarchy",
   "description": "Granola meeting notepad on Linux: install the desktop app and show recording status on the Omarchy bar.",
   "kinds": [
     "bar-widget"
