@@ -23,9 +23,11 @@ Panel {
   readonly property var featuredEvent: granola.nowEvent || granola.nextEvent
   readonly property var comingUp: granola.upcoming || []
   readonly property var hoverEvent: {
-    if (comingUp.length > 0) return comingUp[0]
+    // Prefer the next meeting that has not started. comingUp is the list
+    // after that, so using it first skipped "what's next" when idle.
     if (granola.nextEvent && !granola.nextEvent.happening) return granola.nextEvent
-    return granola.nextEvent || granola.nowEvent
+    if (comingUp.length > 0) return comingUp[0]
+    return granola.nowEvent || granola.nextEvent
   }
   readonly property string heroMeta: {
     if (!granola.installed) return "Not installed"
