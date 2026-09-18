@@ -22,6 +22,11 @@ Item {
   property string actionStatus: ""
   property bool refreshing: false
   property var nextEvent: null
+  property var nowEvent: null
+  property var upcoming: []
+  property string appVersion: ""
+  property string latestVersion: ""
+  property bool updateAvailable: false
 
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 5, 2, 60)
   readonly property int pollMs: (kind === "recording" ? 2 : refreshIntervalSec) * 1000
@@ -71,6 +76,11 @@ Item {
     kind = String(parsed.kind || "missing")
     lastError = String(parsed.lastError || "")
     nextEvent = parsed.nextEvent || null
+    nowEvent = parsed.nowEvent || null
+    upcoming = parsed.upcoming || []
+    appVersion = String(parsed.appVersion || "")
+    latestVersion = String(parsed.latestVersion || "")
+    updateAvailable = parsed.updateAvailable === true
   }
 
   function elideStatus(text) {
@@ -113,6 +123,10 @@ Item {
 
   function quitApp() {
     runAction("quit")
+  }
+
+  function updateApp() {
+    runAction("update")
   }
 
   Timer {

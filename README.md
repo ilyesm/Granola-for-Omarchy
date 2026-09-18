@@ -21,12 +21,13 @@ The bar widget:
 
 | | |
 |---|---|
-| Left click | Status panel with the next calendar event |
+| Left click | Panel with the current/next meeting, people, location, and coming-up list |
 | Switch / right click | Start a recording (`granola://new-document?auto_transcribe=1`) |
+| Super+Shift+R | Same recording action, as a Hyprland global bind (Wayland cannot use Electron globalShortcut) |
 | Middle click | Refresh |
 | Recording | Icon pulses and turns the urgent color while Granola has a microphone capture |
 
-Upcoming events are read from Granola’s encrypted local database (SQLCipher) using the key in `Granola Safe Storage` on the session keyring. Notes stay in Granola.
+Upcoming events are read from Granola’s encrypted local database (SQLCipher) using the key in `Granola Safe Storage` on the session keyring. Notes stay in Granola. If a newer Granola `.dmg` is on granola.ai, the panel offers **Update**.
 
 Update later with `omarchy plugin update ilyesm.granola`. Remove with `omarchy plugin remove ilyesm.granola`. Uninstall the desktop app with `./uninstall.sh` (`--purge` also drops `~/.config/Granola`).
 
@@ -53,11 +54,11 @@ Set `INSTALL_DIR=` to install somewhere other than `~/Applications/granola`.
 | ✅ | Sign-in with Google, Microsoft, or SSO |
 | ✅ | Encrypted local database that survives restarts |
 | ✅ | Microphone recording |
-| ✅ | Omarchy bar: running / recording / not-installed |
-| ⚠️ | System audio capture is limited. The macOS build uses Core Audio to hear the other side of a call. On Linux the app falls back to a browser-style capture path. |
+| ✅ | Omarchy bar: next meeting, coming up, recording switch |
+| ✅ | Global record hotkey on Hyprland (`Super+Shift+R`) |
+| ✅ | Manual update from the bar when a newer `.dmg` is published |
+| ⚠️ | System audio is Chromium/PipeWire `getDisplayMedia`, not Core Audio. The launcher enables `WebRTCPipeWireCapturer`; the other side of a call is still weaker than macOS. |
 | ❌ | Apple Calendar (EventKit). Google and Microsoft calendars still work, since those run on the server. |
-| ❌ | Global hotkeys |
-| ❌ | Auto-update. Run the script again (or the bar **Install** action) with a newer `.dmg`. |
 
 ## Build it yourself
 

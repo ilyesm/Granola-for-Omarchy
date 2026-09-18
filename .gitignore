@@ -2,3 +2,4 @@
 *.dmg
 *.asar
 *.asar.unpacked
+scripts/__pycache__/

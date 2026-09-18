@@ -106,6 +106,9 @@ cp "$INSTALL_DIR/resources/icons/icon.png" "$INSTALL_DIR/granola-icon.png"
 "$SEVENZZ" e "$DMG" "Granola/Granola.app/Contents/Info.plist" -o"$WORK/appinfo" -y >/dev/null 2>&1 || true
 APP_VER="$(grep -A1 CFBundleShortVersionString "$WORK/appinfo/Info.plist" 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
 info "Granola ${APP_VER:-?} payload installed"
+if [[ -n "${APP_VER:-}" ]]; then
+  printf '%s\n' "$APP_VER" > "$INSTALL_DIR/granola-app-version"
+fi
 
 
 step "Patching the platform string"
@@ -264,7 +267,7 @@ if [[ -z "\${NODE_EXTRA_CA_CERTS:-}" && -f /etc/ca-certificates/trust-source/anc
   export NODE_EXTRA_CA_CERTS=/etc/ca-certificates/trust-source/anchors/cloudflare-gateway-managed-g1.pem
   export NODE_USE_SYSTEM_CA=1
 fi
-exec "\$DIR/electron" --ozone-platform-hint=auto --password-store=gnome-libsecret "\$@"
+exec "\$DIR/electron" --ozone-platform-hint=auto --password-store=gnome-libsecret --enable-features=WebRTCPipeWireCapturer "\$@"
 EOF
 chmod +x "$INSTALL_DIR/granola.sh"
 

@@ -8,6 +8,7 @@ import os
 import signal
 import subprocess
 import sys
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -21,6 +22,8 @@ READ_EVENTS = Path(__file__).resolve().parent / "read_events.js"
 BS3 = INSTALL_DIR / "resources" / "app.asar.unpacked" / "node_modules" / "better-sqlite3-multiple-ciphers" / "lib" / "index.js"
 EVENT_CACHE = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")) / "ilyesm.granola" / "next-event.json"
 EVENT_CACHE_TTL_SEC = 20
+LATEST_CACHE = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")) / "ilyesm.granola" / "latest.json"
+LATEST_CACHE_TTL_SEC = 6 * 3600
 
 
 def dump(payload: dict) -> int:
@@ -44,6 +47,11 @@ def default_status() -> dict:
         "kind": "missing",
         "lastError": "",
         "nextEvent": None,
+        "nowEvent": None,
+        "upcoming": [],
+        "appVersion": "",
+        "latestVersion": "",
+        "updateAvailable": False,
     }
 
 
@@ -275,11 +283,34 @@ def format_when(start_iso: str, end_iso: str) -> str:
     return f"{day} {clock(start)} – {clock(end)}"
 
 
-def public_event(event: dict | None) -> dict | None:
+def people_label(names: list) -> str:
+    clean = [str(name).strip() for name in names if str(name).strip()]
+    if not clean:
+        return ""
+    if len(clean) == 1:
+        return clean[0]
+    if len(clean) == 2:
+        return f"{clean[0]} and {clean[1]}"
+    return f"{clean[0]} + {len(clean) - 1}"
+
+
+def parse_iso(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def public_event(event: dict | None, now: datetime | None = None) -> dict | None:
     if not event:
         return None
     start = str(event.get("start") or "")
     end = str(event.get("end") or "")
+    start_at = parse_iso(start)
+    end_at = parse_iso(end)
+    current = now or datetime.now(timezone.utc)
+    happening = bool(start_at and end_at and start_at <= current <= end_at)
+    people = event.get("people") if isinstance(event.get("people"), list) else []
     return {
         "id": str(event.get("id") or ""),
         "title": str(event.get("title") or "Untitled"),
@@ -287,6 +318,9 @@ def public_event(event: dict | None) -> dict | None:
         "end": end,
         "when": format_when(start, end),
         "location": str(event.get("location") or ""),
+        "people": people,
+        "peopleLabel": people_label(people),
+        "happening": happening,
         "soon": event_is_soon(start, end),
     }
 
@@ -333,8 +367,19 @@ def collect() -> dict:
     status["hasWindow"] = bool(windows)
     events, recording_hint = calendar_snapshot()
     status["recording"] = (pulse_recording(pids) if pids else False) or (bool(pids) and recording_hint)
-    event = public_event(events[0] if events else None)
-    status["nextEvent"] = event
+    now = datetime.now(timezone.utc)
+    published = [item for item in (public_event(event, now) for event in events) if item]
+    happening = [item for item in published if item.get("happening")]
+    later = [item for item in published if not item.get("happening")]
+    now_event = happening[0] if happening else None
+    status["nowEvent"] = now_event
+    status["nextEvent"] = now_event or (later[0] if later else None)
+    status["upcoming"] = (later if now_event else later[1:])[:5]
+    event = status["nextEvent"]
+    app_ver, latest_ver, update = update_info()
+    status["appVersion"] = app_ver
+    status["latestVersion"] = latest_ver
+    status["updateAvailable"] = update
     if not installed:
         status["kind"] = "missing"
         status["statusText"] = "Not installed"
@@ -354,6 +399,77 @@ def collect() -> dict:
         status["kind"] = "idle"
         status["statusText"] = "Installed"
     return status
+
+
+def parse_version(value: str) -> tuple[int, ...]:
+    parts = []
+    for item in str(value or "").split("."):
+        if not item.isdigit():
+            break
+        parts.append(int(item))
+    return tuple(parts)
+
+
+def installed_app_version() -> str:
+    path = INSTALL_DIR / "granola-app-version"
+    try:
+        return path.read_text(encoding="utf-8").strip().splitlines()[0]
+    except OSError:
+        return ""
+
+
+def fetch_latest_version() -> str:
+    try:
+        req = urllib.request.Request(
+            "https://api.granola.ai/v1/download-latest",
+            method="HEAD",
+            headers={"User-Agent": "ilyesm.granola"},
+        )
+        with urllib.request.urlopen(req, timeout=2) as response:
+            location = response.geturl()
+    except Exception:
+        return ""
+    name = location.rsplit("/", 1)[-1]
+    if name.startswith("Granola-") and "-mac" in name:
+        return name[len("Granola-"):].split("-mac", 1)[0]
+    return ""
+
+
+def cached_latest() -> str | None:
+    try:
+        age = datetime.now(timezone.utc).timestamp() - LATEST_CACHE.stat().st_mtime
+        if age > LATEST_CACHE_TTL_SEC:
+            return None
+        data = json.loads(LATEST_CACHE.read_text(encoding="utf-8"))
+        return str(data.get("version") or "")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def store_latest(version: str) -> None:
+    try:
+        LATEST_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = LATEST_CACHE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"version": version}), encoding="utf-8")
+        tmp.chmod(0o600)
+        tmp.replace(LATEST_CACHE)
+    except OSError:
+        pass
+
+
+def update_info() -> tuple[str, str, bool]:
+    installed = installed_app_version()
+    latest = cached_latest()
+    if latest is None:
+        latest = fetch_latest_version()
+        if latest:
+            store_latest(latest)
+        else:
+            latest = ""
+    have = parse_version(installed)
+    want = parse_version(latest)
+    available = bool(have and want and want > have)
+    return installed, latest, available
 
 
 def run(command: list[str]) -> None:
@@ -458,7 +574,7 @@ def main() -> int:
         return dump(stop_recording(status))
     if action == "open":
         return dump(open_app(status))
-    if action == "install":
+    if action in ("install", "update"):
         return dump(install_app())
     if action in ("quit",):
         return dump(quit_app(status))
