@@ -3,37 +3,53 @@
 #if !defined(_WIN32) && !defined(__APPLE__)
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include <cstdlib>
 #include <unistd.h>
+
+// Default X11 error handling aborts the process. Granola on Wayland still
+// calls this addon with a native window id of 0, which produced:
+//   X Error: BadWindow (invalid Window parameter)  X_QueryPointer  0x0
+static int IgnoreXError(Display*, XErrorEvent*) { return 0; }
 
 Napi::Value StartDrag(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
 
-  if (info.Length() < 1) {
-    Napi::TypeError::New(env, "Expected window id as first argument").ThrowAsJavaScriptException();
+  // Native Wayland windows have no X11 id. Never open a Display in that case.
+  if (std::getenv("WAYLAND_DISPLAY") && !std::getenv("GRANOLA_ALLOW_X11_DRAG")) {
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    return env.Null();
+  }
+
+  Window window = (Window)info[0].As<Napi::Number>().Int64Value();
+  if (window == 0) {
     return env.Null();
   }
 
   Display* display = XOpenDisplay(NULL);
   if (!display) {
-    Napi::TypeError::New(env, "Cannot open X display").ThrowAsJavaScriptException();
     return env.Null();
   }
 
-  Window window = (Window)info[0].As<Napi::Number>().Int64Value();
+  XSetErrorHandler(IgnoreXError);
 
   Window root, child;
   int root_x, root_y, win_x, win_y;
   unsigned int mask;
-  XQueryPointer(display, window, &root, &child, &root_x, &root_y, &win_x, &win_y, &mask);
+  if (!XQueryPointer(display, window, &root, &child, &root_x, &root_y, &win_x, &win_y, &mask)) {
+    XCloseDisplay(display);
+    return env.Null();
+  }
 
   Atom moveAtom = XInternAtom(display, "_NET_WM_MOVERESIZE", False);
   if (moveAtom == None) {
     XCloseDisplay(display);
-    Napi::TypeError::New(env, "Cannot find _NET_WM_MOVERESIZE atom").ThrowAsJavaScriptException();
     return env.Null();
   }
 
-  XEvent xev = {0};
+  XEvent xev = {};
   xev.xclient.type = ClientMessage;
   xev.xclient.window = window;
   xev.xclient.message_type = moveAtom;
