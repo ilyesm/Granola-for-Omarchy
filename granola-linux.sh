@@ -49,6 +49,13 @@ if [[ -z "$SEVENZZ" ]]; then
     info "7zz not found, downloading the official static build (LZFSE support)"
     curl -fsSL -o "$WORK/7z.tar.xz" "https://www.7-zip.org/a/7z2501-linux-${SEVEN_ARCH}.tar.xz" \
       || die "could not download 7zz; install it manually and re-run"
+    case "$SEVEN_ARCH" in
+      arm64) expect=39c5140f02ce4436599303c59a149f654cb1bbc47cdc105a942120d747ae040d ;;
+      x64)   expect=4ca3b7c6f2f67866b92622818b58233dc70367be2f36b498eb0bdeaaa44b53f4 ;;
+      *) die "no checksum for 7zz linux-$SEVEN_ARCH" ;;
+    esac
+    echo "$expect  $WORK/7z.tar.xz" | sha256sum -c --status \
+      || die "7zz checksum mismatch; refusing to run an unverified binary"
     tar xf "$WORK/7z.tar.xz" -C "$CACHE_DIR" 7zz
     chmod +x "$SEVENZZ"
   fi
@@ -81,8 +88,14 @@ step "Fetching the Linux Electron runtime"
 ZIP="$CACHE_DIR/electron-v$EL_VER-linux-$EL_ARCH.zip"
 if [[ ! -f "$ZIP" ]]; then
   URL="https://github.com/electron/electron/releases/download/v$EL_VER/electron-v$EL_VER-linux-$EL_ARCH.zip"
+  SUMS="https://github.com/electron/electron/releases/download/v$EL_VER/SHASUMS256.txt"
   info "downloading $URL"
   curl -fL --progress-bar -o "$ZIP.part" "$URL" || die "download failed"
+  curl -fsSL -o "$WORK/SHASUMS256.txt" "$SUMS" || die "could not download Electron checksums"
+  expect="$(awk -v f="electron-v${EL_VER}-linux-${EL_ARCH}.zip" '$2==f {print $1}' "$WORK/SHASUMS256.txt")"
+  [[ -n "$expect" ]] || die "no checksum in SHASUMS256.txt for linux-$EL_ARCH"
+  echo "$expect  $ZIP.part" | sha256sum -c --status \
+    || die "Electron checksum mismatch; refusing to run an unverified binary"
   mv "$ZIP.part" "$ZIP"
 else
   info "using cached $(basename "$ZIP")"
@@ -174,8 +187,14 @@ DRAG="$INSTALL_DIR/resources/app.asar.unpacked/node_modules/electron-click-drag-
 if [[ "$EL_ARCH" == "arm64" ]]; then
   info "no linux-arm64 prebuild; compiling from source"
   DRAG_SRC="$WORK/electron-click-drag-plugin"
-  git clone --depth 1 https://github.com/Wargraphs/electron-click-drag-plugin.git "$DRAG_SRC" >/dev/null 2>&1 \
-    || die "could not clone electron-click-drag-plugin"
+  DRAG_REV=499dfe32c4265d4eba97124121180eeed5544701
+  mkdir -p "$DRAG_SRC"
+  git -C "$DRAG_SRC" init -q
+  git -C "$DRAG_SRC" remote add origin https://github.com/Wargraphs/electron-click-drag-plugin.git
+  git -C "$DRAG_SRC" fetch -q --depth 1 origin "$DRAG_REV" \
+    || die "could not fetch electron-click-drag-plugin @$DRAG_REV"
+  git -C "$DRAG_SRC" checkout -q --detach "$DRAG_REV" \
+    || die "could not checkout electron-click-drag-plugin @$DRAG_REV"
   python3 - "$DRAG_SRC/binding.gyp" <<'PYEOF'
 from pathlib import Path
 import sys

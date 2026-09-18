@@ -44,6 +44,8 @@ You do not need the bar widget to run Granola:
 
 Needs `g++` 11+, `node`, `npm`, `python3`, `curl`, `make`, and a modern `7zz` (LZFSE). Distro `p7zip` cannot read the `.dmg`. On x86-64 or aarch64 the script fetches the matching Electron runtime.
 
+Bar-widget extras (Arch packages): `python-secretstorage` `python-cryptography`. linux-arm64 also needs `libx11` to compile `electron-click-drag-plugin`. The installer verifies SHA-256 of 7zz and Electron before running them. It does not use `sudo`.
+
 Tested on Pop!_OS (Granola 7.452.1, Electron 42.7.0) and Arch Linux ARM / Omarchy on Apple Silicon (Granola 7.576.0, Electron 44.0.0).
 
 Set `INSTALL_DIR=` to install somewhere other than `~/Applications/granola`.
