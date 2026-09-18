@@ -1,5 +1,7 @@
 # Granola on Linux
 
+Fork of [tirtha4/Granola-for-Linux](https://github.com/tirtha4/Granola-for-Linux) with linux-arm64 (Apple Silicon) support.
+
 [Granola](https://www.granola.ai) only ships for macOS and Windows. It is an Electron app though, so the macOS `.dmg` already holds all of the app's JavaScript, which runs anywhere. It is just attached to a macOS runtime. This repo swaps in the Linux runtime and fixes what breaks. You get a real Linux app. No Wine, no VM, no emulation.
 
 ![Granola running on Linux](docs/screenshot.png)
@@ -13,7 +15,9 @@
 
 That is it. The script installs to `~/Applications/granola`, adds a desktop entry, registers the `granola://` sign-in handler, and tests the build before it tells you it worked. Run `./uninstall.sh` to undo it.
 
-Set `INSTALL_DIR=` to install somewhere else. You need x86-64 and g++ 11 or newer. Tested on Pop!\_OS (Ubuntu 20.04 base, glibc 2.32) with Granola 7.452.1 and Electron 42.7.0.
+Set `INSTALL_DIR=` to install somewhere else. You need x86-64 or aarch64, and g++ 11 or newer. Tested on Pop!\_OS (Ubuntu 20.04 base, glibc 2.32) with Granola 7.452.1 and Electron 42.7.0, and on Arch Linux ARM (Apple Silicon / Omarchy) with Granola 7.576.0 and Electron 44.0.0.
+
+On aarch64 the script downloads `electron-*-linux-arm64.zip`, rebuilds `better-sqlite3-multiple-ciphers` for arm64, and compiles `electron-click-drag-plugin` (no upstream linux-arm64 prebuild). Arch packages: `gcc` `make` `python` `curl`; `7zz` comes from the official arm64 static build if it is not already on `PATH`. Do not use distro `p7zip` — it cannot read the `.dmg`'s LZFSE compression.
 
 ## What works
 

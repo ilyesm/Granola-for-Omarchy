@@ -25,13 +25,21 @@ for cmd in node npm python3 curl make; do
   command -v "$cmd" >/dev/null || die "'$cmd' not found. Please install it."
 done
 
+HOST_ARCH="$(uname -m)"
+case "$HOST_ARCH" in
+  x86_64)  EL_ARCH=x64;   SEVEN_ARCH=x64;   NODE_ARCH=x64 ;;
+  aarch64) EL_ARCH=arm64; SEVEN_ARCH=arm64; NODE_ARCH=arm64 ;;
+  *) die "unsupported architecture: $HOST_ARCH (need x86_64 or aarch64)" ;;
+esac
+info "host: $HOST_ARCH (Electron linux-$EL_ARCH)"
+
 
 SEVENZZ="$(command -v 7zz || true)"
 if [[ -z "$SEVENZZ" ]]; then
   SEVENZZ="$CACHE_DIR/7zz"
   if [[ ! -x "$SEVENZZ" ]]; then
     info "7zz not found, downloading the official static build (LZFSE support)"
-    curl -fsSL -o "$WORK/7z.tar.xz" https://www.7-zip.org/a/7z2501-linux-x64.tar.xz \
+    curl -fsSL -o "$WORK/7z.tar.xz" "https://www.7-zip.org/a/7z2501-linux-${SEVEN_ARCH}.tar.xz" \
       || die "could not download 7zz; install it manually and re-run"
     tar xf "$WORK/7z.tar.xz" -C "$CACHE_DIR" 7zz
     chmod +x "$SEVENZZ"
@@ -62,9 +70,9 @@ info "Electron $EL_VER"
 
 step "Fetching the Linux Electron runtime"
 
-ZIP="$CACHE_DIR/electron-v$EL_VER-linux-x64.zip"
+ZIP="$CACHE_DIR/electron-v$EL_VER-linux-$EL_ARCH.zip"
 if [[ ! -f "$ZIP" ]]; then
-  URL="https://github.com/electron/electron/releases/download/v$EL_VER/electron-v$EL_VER-linux-x64.zip"
+  URL="https://github.com/electron/electron/releases/download/v$EL_VER/electron-v$EL_VER-linux-$EL_ARCH.zip"
   info "downloading $URL"
   curl -fL --progress-bar -o "$ZIP.part" "$URL" || die "download failed"
   mv "$ZIP.part" "$ZIP"
@@ -135,7 +143,7 @@ cp -r "$BS3" "$WORK/bs3"
 cp "$WORK/package/binding.gyp" "$WORK/bs3/"
 
 ( cd "$WORK/bs3" && CC="$CC" CXX="$CXX" npx --yes node-gyp rebuild --release \
-    --runtime=electron --target="$EL_VER" --arch=x64 \
+    --runtime=electron --target="$EL_VER" --arch="$NODE_ARCH" \
     --dist-url=https://electronjs.org/headers ) >"$WORK/build.log" 2>&1 \
   || { tail -30 "$WORK/build.log"; die "native build failed (full log: $WORK/build.log)"; }
 
@@ -143,12 +151,112 @@ cp "$WORK/bs3/build/Release/better_sqlite3.node" \
    "$WORK/bs3/build/Release/test_extension.node" "$BS3/build/Release/"
 
 
+step "Building electron-click-drag-plugin for Linux"
+
+# Granola's macOS payload only ships darwin / win32 / linux-x64 drag.node.
+# The main process requires the addon at startup. Electron only loads
+# unpacked files that are listed in the asar header, so on linux-arm64 we
+# compile the upstream X11 implementation and drop it on the linux-x64
+# path (already marked unpacked), then same-length-patch index.js to
+# report arch x64 so the loader finds it.
+DRAG="$INSTALL_DIR/resources/app.asar.unpacked/node_modules/electron-click-drag-plugin"
+if [[ "$EL_ARCH" == "arm64" ]]; then
+  info "no linux-arm64 prebuild; compiling from source"
+  DRAG_SRC="$WORK/electron-click-drag-plugin"
+  git clone --depth 1 https://github.com/Wargraphs/electron-click-drag-plugin.git "$DRAG_SRC" >/dev/null 2>&1 \
+    || die "could not clone electron-click-drag-plugin"
+  python3 - "$DRAG_SRC/binding.gyp" <<'PYEOF'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]); t = p.read_text()
+old = '''        [ "OS=='mac'", {'''
+new = '''        [ "OS=='linux'", {
+          "libraries": [ "-lX11" ]
+        }],
+        [ "OS=='mac'", {'''
+if "OS=='linux'" not in t:
+    if old not in t:
+        raise SystemExit("binding.gyp pattern not found")
+    p.write_text(t.replace(old, new, 1))
+PYEOF
+  ( cd "$DRAG_SRC" && npm install --no-audit --no-fund --no-save node-addon-api >/dev/null \
+      && CC="$CC" CXX="$CXX" npx --yes node-gyp rebuild --release \
+           --runtime=electron --target="$EL_VER" --arch="$NODE_ARCH" \
+           --dist-url=https://electronjs.org/headers ) >"$WORK/drag-build.log" 2>&1 \
+    || { tail -30 "$WORK/drag-build.log"; die "click-drag native build failed"; }
+  python3 - "$DRAG" "$DRAG_SRC/build/Release/drag.node" "$INSTALL_DIR/resources/app.asar" <<'PYEOF'
+import hashlib, struct, sys
+from pathlib import Path
+
+plugin = Path(sys.argv[1])
+blob = Path(sys.argv[2]).read_bytes()
+asar_path = Path(sys.argv[3])
+
+index_path = plugin / "index.js"
+index = index_path.read_bytes()
+old = b"const arch = os.arch();"
+new = b"const arch = 'x64';    "
+if old not in index:
+    raise SystemExit("click-drag index.js arch pattern not found")
+index = index.replace(old, new, 1)
+index_path.write_bytes(index)
+
+dest = plugin / "build/Release/linux-x64/drag.node"
+dest.parent.mkdir(parents=True, exist_ok=True)
+dest.write_bytes(blob)
+(plugin / "build/Release/drag.node").write_bytes(blob)
+arm = plugin / "build/Release/linux-arm64/drag.node"
+arm.parent.mkdir(parents=True, exist_ok=True)
+arm.write_bytes(blob)
+
+data = bytearray(asar_path.read_bytes())
+json_str_len = struct.unpack_from("<I", data, 12)[0]
+json_start = 16
+text = bytes(data[json_start:json_start + json_str_len]).decode()
+
+def swap(hay, old, new, label):
+    if old == new:
+        return hay
+    if old not in hay:
+        raise SystemExit(f"asar header missing {label}")
+    if len(old) != len(new):
+        raise SystemExit(f"asar header length mismatch for {label}: {len(old)} vs {len(new)}")
+    return hay.replace(old, new, 1)
+
+# linux-x64 drag.node size/hash. Size is a JSON number; keep digit count.
+old_size = '"linux-x64":{"files":{"drag.node":{"size":65536'
+new_size = f'"linux-x64":{{"files":{{"drag.node":{{"size":{len(blob):05d}'
+if old_size in text:
+    text = swap(text, old_size, new_size, "drag.node size")
+old_hash = "31a45ef9ba72e377811843511814075d0634ba7d6eabb3b5f66e6278a18a4e96"
+new_hash = hashlib.sha256(blob).hexdigest()
+if old_hash in text:
+    text = swap(text, old_hash, new_hash, "drag.node hash")
+old_ih = "f4d95e2bd398c0b5f75bc7ebc056a8b73164acf518f17503b110ad33a8726c2d"
+new_ih = hashlib.sha256(index).hexdigest()
+if old_ih in text:
+    text = swap(text, old_ih, new_ih, "index.js hash")
+
+enc = text.encode()
+if len(enc) != json_str_len:
+    raise SystemExit(f"asar json length changed {json_str_len} -> {len(enc)}")
+data[json_start:json_start + json_str_len] = enc
+asar_path.write_bytes(data)
+print(f"    linux-arm64 drag.node installed ({len(blob)} bytes)")
+PYEOF
+fi
+
+
 step "Installing launcher and desktop entry"
 
 cat > "$INSTALL_DIR/granola.sh" <<EOF
 #!/usr/bin/env bash
 DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-exec "\$DIR/electron" --ozone-platform-hint=auto "\$@"
+if [[ -z "\${NODE_EXTRA_CA_CERTS:-}" && -f /etc/ca-certificates/trust-source/anchors/cloudflare-gateway-managed-g1.pem ]]; then
+  export NODE_EXTRA_CA_CERTS=/etc/ca-certificates/trust-source/anchors/cloudflare-gateway-managed-g1.pem
+  export NODE_USE_SYSTEM_CA=1
+fi
+exec "\$DIR/electron" --ozone-platform-hint=auto --password-store=gnome-libsecret "\$@"
 EOF
 chmod +x "$INSTALL_DIR/granola.sh"
 
@@ -165,6 +273,11 @@ Categories=Office;Utility;
 StartupWMClass=granola
 MimeType=x-scheme-handler/granola;
 EOF
+
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+mkdir -p "$ICON_DIR"
+cp "$INSTALL_DIR/granola-icon.png" "$ICON_DIR/granola.png"
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 
 command -v update-desktop-database >/dev/null && update-desktop-database "$(dirname "$DESKTOP_FILE")" 2>/dev/null || true
 
