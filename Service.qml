@@ -21,6 +21,7 @@ Item {
   property string lastError: ""
   property string actionStatus: ""
   property bool refreshing: false
+  property var nextEvent: null
 
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 5, 2, 60)
   readonly property int pollMs: (kind === "recording" ? 2 : refreshIntervalSec) * 1000
@@ -69,6 +70,7 @@ Item {
     statusText = String(parsed.statusText || (installed ? "Installed" : "Not installed"))
     kind = String(parsed.kind || "missing")
     lastError = String(parsed.lastError || "")
+    nextEvent = parsed.nextEvent || null
   }
 
   function elideStatus(text) {
@@ -86,18 +88,31 @@ Item {
     runAction("open")
   }
 
+  function startRecording() {
+    if (!installed) {
+      installApp()
+      return
+    }
+    recording = true
+    runAction("record")
+  }
+
+  function stopRecording() {
+    runAction("stop")
+  }
+
+  function toggleRecording() {
+    if (!installed) installApp()
+    else if (recording) stopRecording()
+    else startRecording()
+  }
+
   function installApp() {
     runAction("install")
   }
 
   function quitApp() {
     runAction("quit")
-  }
-
-  function toggleRunning() {
-    if (!installed) installApp()
-    else if (running) quitApp()
-    else openApp()
   }
 
   Timer {

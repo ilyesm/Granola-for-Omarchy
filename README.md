@@ -21,12 +21,12 @@ The bar widget:
 
 | | |
 |---|---|
-| Left click | Status panel |
-| Right click | Open / quit Granola |
+| Left click | Status panel with the next calendar event |
+| Switch / right click | Start a recording (`granola://new-document?auto_transcribe=1`) |
 | Middle click | Refresh |
 | Recording | Icon pulses and turns the urgent color while Granola has a microphone capture |
 
-It cannot read your notes or calendar. Those stay in Granola’s encrypted local database.
+Upcoming events are read from Granola’s encrypted local database (SQLCipher) using the key in `Granola Safe Storage` on the session keyring. Notes stay in Granola.
 
 Update later with `omarchy plugin update ilyesm.granola`. Remove with `omarchy plugin remove ilyesm.granola`. Uninstall the desktop app with `./uninstall.sh` (`--purge` also drops `~/.config/Granola`).
 

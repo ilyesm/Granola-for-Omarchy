@@ -19,16 +19,26 @@ Panel {
     if (!granola.running) return Qt.darker(barForeground, 1.35)
     return barForeground
   }
+  readonly property var nextEvent: granola.nextEvent
   readonly property string heroMeta: {
     if (!granola.installed) return "Not installed"
-    if (granola.recording) return "Listening"
+    if (granola.recording) return "Recording"
+    if (nextEvent && nextEvent.when) return nextEvent.when
     if (granola.running) return granola.loggedIn ? "Open" : "Sign in"
     return granola.loggedIn ? "Ready" : "Installed"
   }
   readonly property string toggleHint: {
     if (!granola.installed) return "Install Granola"
-    if (granola.running) return "Quit Granola"
-    return "Open Granola"
+    if (granola.recording) return "Recording — click to open Granola"
+    return "Start recording"
+  }
+  readonly property string tooltipText: {
+    if (granola.recording) return "Recording"
+    if (nextEvent && nextEvent.title) {
+      var when = nextEvent.when ? " · " + nextEvent.when : ""
+      return nextEvent.title + when
+    }
+    return granola.statusText
   }
 
   implicitWidth: button.implicitWidth
@@ -48,7 +58,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    tooltipText: granola.statusText
+    tooltipText: root.tooltipText
     active: granola.kind === "recording"
     iconComponent: Component {
       Item {
@@ -63,7 +73,7 @@ Panel {
       }
     }
     onPressed: function(buttonCode) {
-      if (buttonCode === Qt.RightButton) granola.toggleRunning()
+      if (buttonCode === Qt.RightButton) granola.toggleRecording()
       else if (buttonCode === Qt.MiddleButton) granola.refresh()
       else root.toggle()
     }
@@ -83,11 +93,12 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       clip: true
-      onActivateRequested: granola.toggleRunning()
+      onActivateRequested: granola.toggleRecording()
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
         if (t === "o" || t === "O") granola.openApp()
+        else if (t === "n" || t === "N") granola.startRecording()
         else if (t === "i" || t === "I") granola.installApp()
         else if (t === "q" || t === "Q") granola.quitApp()
         else if (t === "r" || t === "R") granola.refresh()
@@ -111,9 +122,9 @@ Panel {
           PanelHero {
             id: hero
             width: parent.width
-            title: "Granola"
+            title: nextEvent && nextEvent.title ? nextEvent.title : "Granola"
             meta: root.heroMeta
-            detail: granola.version !== "" ? "Electron " + granola.version : ""
+            detail: granola.recording ? "Listening" : (granola.version !== "" ? "Electron " + granola.version : "")
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconOpacity: granola.running || granola.recording ? 1.0 : 0.55
@@ -130,10 +141,10 @@ Panel {
               ToggleSwitch {
                 id: powerSwitch
                 visible: granola.installed
-                checked: granola.running
+                checked: granola.recording
                 busy: granola.busy
                 foreground: hero.foreground
-                onToggled: granola.toggleRunning()
+                onToggled: granola.toggleRecording()
 
                 PanelToolTip {
                   visible: powerSwitch.containsMouse
@@ -168,10 +179,8 @@ Panel {
             visible: granola.installed
             width: parent.width
             text: granola.recording
-              ? "Capturing microphone audio for a meeting."
-              : (granola.running
-                ? (granola.loggedIn ? "Desktop app is running." : "Desktop app is running. Sign in to sync notes.")
-                : "Click the switch or press O to open Granola.")
+              ? "Capturing microphone audio. Flip the switch to jump back to Granola."
+              : "Flip the switch or press N to start a recording."
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
@@ -181,7 +190,7 @@ Panel {
           Text {
             width: parent.width
             text: granola.installed
-              ? "O open  ·  Q quit  ·  R refresh"
+              ? "N record  ·  O open  ·  R refresh"
               : "I install  ·  R refresh"
             color: root.dim
             font.family: root.fontFamily
