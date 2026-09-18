@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "ilyesm.granola",
+  "name": "Granola",
+  "version": "1.0.0",
+  "author": "Ilyas Esmail",
+  "license": "MIT",
+  "homepage": "https://github.com/ilyesm/Granola-for-Linux",
+  "description": "Granola meeting notepad on Linux: install the desktop app and show recording status on the Omarchy bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Granola",
+    "description": "Open Granola, install it if missing, and see when it is recording. Click for details, right-click to launch.",
+    "category": "AI",
+    "aliases": [
+      "granola",
+      "meetings",
+      "notes"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 5
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 2,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 5
+      }
+    ]
+  }
+}

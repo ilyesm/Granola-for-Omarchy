@@ -1,23 +1,49 @@
-# Granola on Linux
+# Granola for Omarchy
 
-Fork of [tirtha4/Granola-for-Linux](https://github.com/tirtha4/Granola-for-Linux) with linux-arm64 (Apple Silicon) support.
+Fork of [tirtha4/Granola-for-Linux](https://github.com/tirtha4/Granola-for-Linux) as an [Omarchy](https://omarchy.org/) plugin: a top-bar widget plus a Linux build of [Granola](https://www.granola.ai).
 
-[Granola](https://www.granola.ai) only ships for macOS and Windows. It is an Electron app though, so the macOS `.dmg` already holds all of the app's JavaScript, which runs anywhere. It is just attached to a macOS runtime. This repo swaps in the Linux runtime and fixes what breaks. You get a real Linux app. No Wine, no VM, no emulation.
+Granola only ships for macOS and Windows. It is an Electron app, so the macOS `.dmg` already holds the JavaScript. This repo swaps in the Linux runtime, rebuilds the native modules, and puts a status icon on the Omarchy bar.
 
-![Granola running on Linux](docs/screenshot.png)
+No Wine, no VM, no emulation.
 
-## Run it
+## Install on Omarchy
 
-1. Download the `.dmg` from [granola.ai/download](https://www.granola.ai/download)
-2. Install what you need: `sudo apt install g++-11 nodejs npm python3 curl make`
-3. Run `./granola-linux.sh "Granola - AI Notepad.dmg"`
-4. Open Granola from your app menu and sign in
+```bash
+omarchy plugin add https://github.com/ilyesm/Granola-for-Linux.git --enable
+```
 
-That is it. The script installs to `~/Applications/granola`, adds a desktop entry, registers the `granola://` sign-in handler, and tests the build before it tells you it worked. Run `./uninstall.sh` to undo it.
+That clones the plugin into `~/.config/omarchy/plugins/ilyesm.granola` and places **Granola** on the top bar (right by default). Then:
 
-Set `INSTALL_DIR=` to install somewhere else. You need x86-64 or aarch64, and g++ 11 or newer. Tested on Pop!\_OS (Ubuntu 20.04 base, glibc 2.32) with Granola 7.452.1 and Electron 42.7.0, and on Arch Linux ARM (Apple Silicon / Omarchy) with Granola 7.576.0 and Electron 44.0.0.
+1. Click the bar icon → **I** or the missing-app prompt to install the desktop app, **or** run `./granola-linux.sh` from this repo (downloads the latest `.dmg` if you do not pass one).
+2. Open Granola from the bar (right-click, or **O** in the panel) and sign in.
 
-On aarch64 the script downloads `electron-*-linux-arm64.zip`, rebuilds `better-sqlite3-multiple-ciphers` for arm64, and compiles `electron-click-drag-plugin` (no upstream linux-arm64 prebuild). Arch packages: `gcc` `make` `python` `curl`; `7zz` comes from the official arm64 static build if it is not already on `PATH`. Do not use distro `p7zip` — it cannot read the `.dmg`'s LZFSE compression.
+The bar widget:
+
+| | |
+|---|---|
+| Left click | Status panel |
+| Right click | Open / quit Granola |
+| Middle click | Refresh |
+| Recording | Icon pulses and turns the urgent color while Granola has a microphone capture |
+
+It cannot read your notes or calendar. Those stay in Granola’s encrypted local database.
+
+Update later with `omarchy plugin update ilyesm.granola`. Remove with `omarchy plugin remove ilyesm.granola`. Uninstall the desktop app with `./uninstall.sh` (`--purge` also drops `~/.config/Granola`).
+
+## Install the desktop app only
+
+You do not need the bar widget to run Granola:
+
+```bash
+./granola-linux.sh
+# or: ./granola-linux.sh "Granola - AI Notepad.dmg"
+```
+
+Needs `g++` 11+, `node`, `npm`, `python3`, `curl`, `make`, and a modern `7zz` (LZFSE). Distro `p7zip` cannot read the `.dmg`. On x86-64 or aarch64 the script fetches the matching Electron runtime.
+
+Tested on Pop!_OS (Granola 7.452.1, Electron 42.7.0) and Arch Linux ARM / Omarchy on Apple Silicon (Granola 7.576.0, Electron 44.0.0).
+
+Set `INSTALL_DIR=` to install somewhere other than `~/Applications/granola`.
 
 ## What works
 
@@ -27,10 +53,11 @@ On aarch64 the script downloads `electron-*-linux-arm64.zip`, rebuilds `better-s
 | ✅ | Sign-in with Google, Microsoft, or SSO |
 | ✅ | Encrypted local database that survives restarts |
 | ✅ | Microphone recording |
-| ⚠️ | System audio capture is limited. The macOS build uses Core Audio to hear the other side of a call. On Linux the app falls back to a browser style capture path. |
+| ✅ | Omarchy bar: running / recording / not-installed |
+| ⚠️ | System audio capture is limited. The macOS build uses Core Audio to hear the other side of a call. On Linux the app falls back to a browser-style capture path. |
 | ❌ | Apple Calendar (EventKit). Google and Microsoft calendars still work, since those run on the server. |
 | ❌ | Global hotkeys |
-| ❌ | Auto-update. Run the script again with a newer `.dmg`. |
+| ❌ | Auto-update. Run the script again (or the bar **Install** action) with a newer `.dmg`. |
 
 ## Build it yourself
 
@@ -43,7 +70,7 @@ If you would rather not run the script, the conversion takes six steps:
 5. Patch the platform string inside `app.asar` so it reports `Windows`. Granola's API returns a 500 error for `platform=linux`, so sign-in fails without this.
 6. Rebuild `better-sqlite3-multiple-ciphers` from the C++ source inside `app.asar.unpacked` using g++ 11 or newer. Granola's version adds an `updateHook()` that no public build has.
 
-Four of those six fail with errors that do not point at the real cause. `granola-linux.sh` has the exact commands, with comments explaining each one.
+On linux-arm64 the script also compiles `electron-click-drag-plugin` (no upstream prebuild). Four of those steps fail with errors that do not point at the real cause. `granola-linux.sh` has the exact commands, with comments explaining each one.
 
 ## Notes
 

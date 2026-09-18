@@ -12,11 +12,19 @@ die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 step() { printf '\n\033[1;36m==>\033[0m \033[1m%s\033[0m\n' "$*"; }
 info() { printf '    %s\n' "$*"; }
 
-[[ -n "$DMG" ]] || die "usage: $0 <path-to-granola.dmg>   (INSTALL_DIR=$INSTALL_DIR)"
-[[ -f "$DMG" ]] || die "no such file: $DMG"
-
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$CACHE_DIR"
+
+if [[ -z "$DMG" ]]; then
+  step "Downloading the latest Granola .dmg"
+  DMG="$CACHE_DIR/Granola-latest.dmg"
+  curl -fL --progress-bar -o "$DMG.part" "https://api.granola.ai/v1/download-latest" \
+    || die "could not download Granola .dmg from api.granola.ai"
+  mv "$DMG.part" "$DMG"
+  info "$DMG"
+elif [[ ! -f "$DMG" ]]; then
+  die "no such file: $DMG"
+fi
 
 
 step "Checking prerequisites"
