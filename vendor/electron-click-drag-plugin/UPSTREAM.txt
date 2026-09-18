@@ -1,0 +1,2 @@
+upstream https://github.com/Wargraphs/electron-click-drag-plugin
+commit 499dfe32c4265d4eba97124121180eeed5544701

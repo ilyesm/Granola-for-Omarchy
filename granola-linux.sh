@@ -70,7 +70,7 @@ done
 if [[ -z "$CXX" ]] && command -v g++ >/dev/null; then
   if [[ "$(g++ -dumpversion | cut -d. -f1)" -ge 11 ]]; then CXX=g++; CC=gcc; fi
 fi
-[[ -n "$CXX" ]] || die "need g++ 11 or newer (Electron 42 headers require C++20). Try: sudo apt install g++-11"
+[[ -n "$CXX" ]] || die "need g++ 11 or newer (Electron 42 headers require C++20)"
 info "compiler: $CXX ($($CXX -dumpversion))"
 
 
@@ -185,30 +185,11 @@ step "Building electron-click-drag-plugin for Linux"
 # report arch x64 so the loader finds it.
 DRAG="$INSTALL_DIR/resources/app.asar.unpacked/node_modules/electron-click-drag-plugin"
 if [[ "$EL_ARCH" == "arm64" ]]; then
-  info "no linux-arm64 prebuild; compiling from source"
+  info "no linux-arm64 prebuild; compiling vendored source"
+  VENDOR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/vendor/electron-click-drag-plugin"
+  [[ -d "$VENDOR" ]] || die "vendored electron-click-drag-plugin is missing from this checkout"
   DRAG_SRC="$WORK/electron-click-drag-plugin"
-  DRAG_REV=499dfe32c4265d4eba97124121180eeed5544701
-  mkdir -p "$DRAG_SRC"
-  git -C "$DRAG_SRC" init -q
-  git -C "$DRAG_SRC" remote add origin https://github.com/Wargraphs/electron-click-drag-plugin.git
-  git -C "$DRAG_SRC" fetch -q --depth 1 origin "$DRAG_REV" \
-    || die "could not fetch electron-click-drag-plugin @$DRAG_REV"
-  git -C "$DRAG_SRC" checkout -q --detach "$DRAG_REV" \
-    || die "could not checkout electron-click-drag-plugin @$DRAG_REV"
-  python3 - "$DRAG_SRC/binding.gyp" <<'PYEOF'
-from pathlib import Path
-import sys
-p = Path(sys.argv[1]); t = p.read_text()
-old = '''        [ "OS=='mac'", {'''
-new = '''        [ "OS=='linux'", {
-          "libraries": [ "-lX11" ]
-        }],
-        [ "OS=='mac'", {'''
-if "OS=='linux'" not in t:
-    if old not in t:
-        raise SystemExit("binding.gyp pattern not found")
-    p.write_text(t.replace(old, new, 1))
-PYEOF
+  cp -a "$VENDOR" "$DRAG_SRC"
   ( cd "$DRAG_SRC" && npm install --no-audit --no-fund --no-save node-addon-api >/dev/null \
       && CC="$CC" CXX="$CXX" npx --yes node-gyp rebuild --release \
            --runtime=electron --target="$EL_VER" --arch="$NODE_ARCH" \
