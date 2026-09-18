@@ -260,14 +260,49 @@ fi
 
 step "Installing launcher and desktop entry"
 
-cat > "$INSTALL_DIR/granola.sh" <<EOF
+cat > "$INSTALL_DIR/granola.sh" <<'EOF'
 #!/usr/bin/env bash
-DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-if [[ -z "\${NODE_EXTRA_CA_CERTS:-}" && -f /etc/ca-certificates/trust-source/anchors/cloudflare-gateway-managed-g1.pem ]]; then
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -z "${NODE_EXTRA_CA_CERTS:-}" && -f /etc/ca-certificates/trust-source/anchors/cloudflare-gateway-managed-g1.pem ]]; then
   export NODE_EXTRA_CA_CERTS=/etc/ca-certificates/trust-source/anchors/cloudflare-gateway-managed-g1.pem
   export NODE_USE_SYSTEM_CA=1
 fi
-exec "\$DIR/electron" --ozone-platform-hint=auto --password-store=gnome-libsecret --enable-features=WebRTCPipeWireCapturer "\$@"
+
+ELECTRON="$DIR/electron"
+FLAGS=(--ozone-platform-hint=auto --password-store=gnome-libsecret --enable-features=WebRTCPipeWireCapturer)
+LOCK="${XDG_CONFIG_HOME:-$HOME/.config}/Granola/SingletonLock"
+
+URLS=()
+ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" == granola://* ]]; then
+    URLS+=("$arg")
+  else
+    ARGS+=("$arg")
+  fi
+done
+
+granola_running() {
+  local target pid
+  target=$(readlink "$LOCK" 2>/dev/null || true)
+  [[ -n "$target" ]] || return 1
+  pid=${target##*-}
+  [[ "$pid" =~ ^[0-9]+$ ]] && [[ -d /proc/$pid ]]
+}
+
+# Linux Electron never parses granola:// from the first-instance argv.
+# Start the app bare, wait until it holds the lock, then re-exec as a
+# second instance so the existing window handles the deep link.
+if ((${#URLS[@]})) && ! granola_running; then
+  "$ELECTRON" "${FLAGS[@]}" "${ARGS[@]}" >/dev/null 2>&1 &
+  for _ in $(seq 1 80); do
+    granola_running && break
+    sleep 0.15
+  done
+  sleep 1.2
+fi
+
+exec "$ELECTRON" "${FLAGS[@]}" "${ARGS[@]}" "${URLS[@]}"
 EOF
 chmod +x "$INSTALL_DIR/granola.sh"
 
