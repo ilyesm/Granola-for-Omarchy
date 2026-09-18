@@ -311,7 +311,7 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Granola
-Comment=AI Notepad for meetings
+Comment=Unofficial Linux build of Granola. Not affiliated with Granola, Inc.
 Exec=$INSTALL_DIR/granola.sh %U
 Icon=$INSTALL_DIR/granola-icon.png
 Terminal=false

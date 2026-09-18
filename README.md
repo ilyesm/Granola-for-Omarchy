@@ -6,6 +6,8 @@ Granola only ships for macOS and Windows. It is an Electron app, so the macOS `.
 
 No Wine, no VM, no emulation.
 
+**Disclaimer:** This is an unofficial community project. It is not affiliated with, endorsed by, or supported by Granola, Inc. Granola® is a trademark of its owners. You still need your own Granola account; this repo only packages their Electron app for Linux and Omarchy.
+
 ## Install on Omarchy
 
 ```bash
@@ -75,6 +77,7 @@ On linux-arm64 the script also compiles `electron-click-drag-plugin` (no upstrea
 
 ## Notes
 
+- Unofficial. Not affiliated with Granola, Inc.
 - Nothing here gets around licensing or sign-in. You use your own account and the app talks to Granola's real servers. The only patch is a platform label that their API refuses to accept.
 - Granola's code belongs to Granola. Do not commit `app.asar` or the `.dmg`. The `.gitignore` covers both.
 - Running the script again is safe. It wipes and rebuilds the install folder and leaves your notes in `~/.config/Granola` alone.

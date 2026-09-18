@@ -6,7 +6,7 @@
   "author": "Ilyas Esmail",
   "license": "MIT",
   "homepage": "https://github.com/ilyesm/Granola-for-Omarchy",
-  "description": "Granola meeting notepad on Linux: install the desktop app and show recording status on the Omarchy bar.",
+  "description": "Unofficial Granola for Linux/Omarchy. Not affiliated with Granola, Inc. Bar widget plus a Linux build of the desktop app.",
   "kinds": [
     "bar-widget"
   ],
@@ -15,7 +15,7 @@
   },
   "barWidget": {
     "displayName": "Granola",
-    "description": "Open Granola, install it if missing, and see when it is recording. Click for details, right-click to launch.",
+    "description": "Unofficial. Not affiliated with Granola, Inc. Open Granola, see the next meeting, start a recording.",
     "category": "AI",
     "aliases": [
       "granola",

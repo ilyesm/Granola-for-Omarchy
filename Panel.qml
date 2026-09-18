@@ -325,6 +325,15 @@ Panel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
+
+          Text {
+            width: parent.width
+            text: "Unofficial. Not affiliated with Granola, Inc."
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
         }
       }
     }
