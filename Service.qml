@@ -103,7 +103,7 @@ Item {
       installApp()
       return
     }
-    recording = true
+    actionStatus = "Starting recording…"
     runAction("record")
   }
 

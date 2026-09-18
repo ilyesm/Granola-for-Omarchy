@@ -98,9 +98,11 @@ def pulse_recording(pids: list[int]) -> bool:
 
     def block_matches(lines: list[str]) -> bool:
         text = "\n".join(lines)
-        if any(f'application.process.id = "{pid}"' in text for pid in want):
-            return True
-        return "granola" in text.lower() and "application.name" in text.lower()
+        if "Corked: yes" in text:
+            return False
+        owned = any(f'application.process.id = "{pid}"' in text for pid in want)
+        named = "granola" in text.lower() and "application.name" in text.lower()
+        return owned or named
 
     for line in completed.stdout.splitlines():
         stripped = line.strip()
@@ -365,8 +367,12 @@ def collect() -> dict:
     status["running"] = bool(pids)
     windows = granola_windows()
     status["hasWindow"] = bool(windows)
-    events, recording_hint = calendar_snapshot()
-    status["recording"] = (pulse_recording(pids) if pids else False) or (bool(pids) and recording_hint)
+    events, _recording_hint = calendar_snapshot()
+    capturing = pulse_recording(pids) if pids else False
+    # A leftover Electron process or a note created in the last few minutes
+    # is not a recording. Only show it when the window is up and Pulse has
+    # an active (uncorked) capture from Granola.
+    status["recording"] = bool(pids) and bool(windows) and capturing
     now = datetime.now(timezone.utc)
     published = [item for item in (public_event(event, now) for event in events) if item]
     happening = [item for item in published if item.get("happening")]
@@ -504,9 +510,6 @@ def start_recording(status: dict) -> dict:
         return status
     url = "granola://new-document?auto_transcribe=1&creation_source=application_menu"
     run([str(LAUNCHER), url])
-    status["recording"] = True
-    status["running"] = True
-    status["kind"] = "recording"
     status["statusText"] = "Starting recording…"
     return status
 

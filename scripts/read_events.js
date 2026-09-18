@@ -80,9 +80,5 @@ for (const row of rows) {
     people: peopleOf(data)
   })
 }
-const cutoff = new Date(Date.now() - 3 * 60 * 1000).toISOString()
-const recent = db.prepare(
-  "SELECT COUNT(*) AS c FROM documents WHERE created_at >= ?"
-).get(cutoff)
 db.close()
-process.stdout.write(JSON.stringify({ events, recordingHint: Number(recent && recent.c) > 0 }))
+process.stdout.write(JSON.stringify({ events, recordingHint: false }))
